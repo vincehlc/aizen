@@ -168,26 +168,32 @@ pub(crate) async fn maybe_run_secretary(
     }
     if let Some(proposal) = output.skill.as_ref().filter(|_| auto_skill_learn_enabled()) {
         let all_skills = skill::list();
-        let target =
-            auto_learn_skill_target(&all_skills, &proposal.name, &proposal.when, &proposal.steps);
-        let done = match target {
-            Some((key, true)) => {
-                proposal.refine
-                    && skill::refine(key, &proposal.steps, None, Some(&proposal.when)).is_ok()
-            }
-            Some((key, false)) => {
+        let views = skill_views(&all_skills);
+        let exact = crate::persona::secretary::auto_learn_skill_target(
+            &views,
+            &skill::sanitize_name(&proposal.name),
+        );
+        // A lexical match only shortlists; the judge decides, and any failure keeps both skills.
+        let judged = match exact {
+            Some(_) => None,
+            None => judge_same_skill(http, &ep, &views, &proposal.when, &proposal.steps).await,
+        };
+        let action = skill_action(exact, judged, proposal.refine);
+        let done = match action {
+            SkillAction::Refine(key) => {
                 skill::refine(key, &proposal.steps, None, Some(&proposal.when)).is_ok()
             }
-            None => skill::save_scoped(&proposal.name, "", &proposal.when, &proposal.steps, true)
-                .is_ok(),
+            SkillAction::Save => {
+                skill::save_scoped(&proposal.name, "", &proposal.when, &proposal.steps, true)
+                    .is_ok()
+            }
+            SkillAction::Skip => false,
         };
         if done {
-            let label = if target.is_some() {
-                "refined"
-            } else {
-                "learned"
+            let (label, name) = match action {
+                SkillAction::Refine(key) => ("refined", key),
+                _ => ("learned", proposal.name.as_str()),
             };
-            let name = target.map(|(key, _)| key).unwrap_or(&proposal.name);
             tui::emit_line(
                 &style(format!(
                     "{}{label} skill '{name}' — /skills to view",
@@ -200,24 +206,53 @@ pub(crate) async fn maybe_run_secretary(
     }
 }
 
-/// Return the install key and whether it is an exact identity match; upstream names are display
-/// metadata, so they must not choose the filesystem target of automatic refinement.
-fn auto_learn_skill_target<'a>(
-    skills: &'a [skill::Skill],
-    name: &str,
-    when: &str,
-    steps: &str,
-) -> Option<(&'a str, bool)> {
-    use crate::persona::secretary;
-    let views: Vec<_> = skills
+pub(crate) use crate::persona::secretary::{skill_action, SkillAction};
+
+fn skill_views(skills: &[skill::Skill]) -> Vec<crate::persona::secretary::SkillView<'_>> {
+    skills
         .iter()
-        .map(|skill| secretary::SkillView {
+        .map(|skill| crate::persona::secretary::SkillView {
             key: skill.key(),
             when: &skill.when,
             steps: &skill.body,
         })
-        .collect();
-    secretary::auto_learn_skill_target(&views, &skill::sanitize_name(name), when, steps)
+        .collect()
+}
+
+/// The judge's two messages; shared with the live eval so it measures exactly this request.
+pub(crate) fn same_skill_messages(
+    when: &str,
+    steps: &str,
+    candidates: &[crate::persona::secretary::SkillView],
+) -> [Message; 2] {
+    use crate::persona::secretary;
+    [
+        Message::system(secretary::same_skill_prompt()),
+        Message::user(secretary::build_same_skill_input(when, steps, candidates)),
+    ]
+}
+
+/// Ask the chore model whether a proposal is the same procedure as a lexically similar skill.
+/// `None` means save as new — and no call at all when nothing fits the judge budget or every
+/// candidate fails the length floor.
+async fn judge_same_skill<'a>(
+    http: &reqwest::Client,
+    ep: &cli_config::ResolvedEndpoint,
+    views: &[crate::persona::secretary::SkillView<'a>],
+    when: &str,
+    steps: &str,
+) -> Option<&'a str> {
+    use crate::persona::secretary;
+    let offered = secretary::offer_candidates(views, when, steps);
+    if offered.is_empty() {
+        return None;
+    }
+    let messages = same_skill_messages(when, steps, &offered);
+    let reply = match chore_chat(http, &ep.base_url, &ep.api_key, &ep.model, &messages, &[]).await {
+        Ok(r) => r,
+        Err(_) => return None,
+    };
+    secretary::final_verdict(&reply.content.unwrap_or_default(), &offered)
 }
 
 /// Did this turn RECOVER from a dead end — a tool result errored, then a LATER tool result in the
@@ -603,19 +638,21 @@ mod learning_tests {
         );
         other.slug = "another-copy".into();
         let skills = [other, aliased];
-        assert_eq!(
-            auto_learn_skill_target(&skills, "local-alias", "", ""),
-            Some(("local-alias", true))
-        );
-        assert_eq!(
-            auto_learn_skill_target(&skills, "upstream", &skills[1].when, &skills[1].body),
-            Some(("local-alias", false))
-        );
-        assert_eq!(
-            auto_learn_skill_target(&skills, "another-copy", "", ""),
-            Some(("another-copy", true))
-        );
-        assert_eq!(auto_learn_skill_target(&skills, "upstream", "", ""), None);
+        let views = skill_views(&skills);
+        let exact = |name| {
+            crate::persona::secretary::auto_learn_skill_target(&views, &skill::sanitize_name(name))
+        };
+        assert_eq!(exact("local-alias"), Some("local-alias"));
+        assert_eq!(exact("another-copy"), Some("another-copy"));
+        // `upstream` is only display metadata: never an exact target, at most a judge candidate
+        // reported under its install key.
+        assert_eq!(exact("upstream"), None);
+        let candidates: Vec<_> =
+            crate::persona::secretary::overlap_candidates(&views, &skills[1].when, &skills[1].body)
+                .iter()
+                .map(|s| s.key)
+                .collect();
+        assert_eq!(candidates, ["local-alias"]);
     }
 
     #[test]
