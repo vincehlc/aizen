@@ -661,3 +661,7 @@ mod learning_tests {
         assert!(chore_call_timeout() <= CHORE_CALL_TIMEOUT);
     }
 }
+
+#[cfg(test)]
+#[path = "skill_learn_tests.rs"]
+mod skill_learn_tests;
