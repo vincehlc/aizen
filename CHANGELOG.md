@@ -5,6 +5,17 @@ All notable changes to **Aizen** (`aizen`) — the pure-Rust agentic coding CLI.
 This repo was extracted from the NextGen monorepo at v0.1.0 (2026-06-27); the detailed pre-0.1.0
 development log lives in that monorepo's history.
 
+## [Unreleased]
+
+### Changed
+- **Auto-learn skill refinement now requires a judge call.** Lexical similarity only shortlists
+  candidates; a chore-model judge decides whether the proposal is the same procedure as a stored
+  skill and must list every important step the proposal lacks. Code refines only when the judge
+  names an offered candidate and the missing-step list is empty. A length floor (15% of stored
+  body, whitespace-collapsed) blocks proposals that are too short to be the same procedure —
+  these are always saved as new without spending tokens. Exact-key refine on deliberate request
+  is unchanged.
+
 ## [0.7.4] — 2026-11-06
 
 ### Added
