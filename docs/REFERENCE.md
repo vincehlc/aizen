@@ -1495,6 +1495,13 @@ errored, then a later call succeeded — that hard-won path is worth saving). Th
 independent of persistent Memory and `memory_auto_learn`. Toggle in `/config` (default on) or
 `aizen config set --auto-skill-learn false`.
 
+**Refinement gate.** When auto-learn considers refining an existing skill, lexical
+similarity only shortlists candidates. A chore-model judge must confirm the proposal is the same
+procedure and list every important step it lacks. Code refines only when the judge names an offered
+candidate and the missing-step list is empty. Proposals shorter than 15% of the stored body
+(whitespace-collapsed) are always saved as new without a judge call. A proposal that names an
+existing skill exactly still refines only when it explicitly asks to (`action: refine`).
+
 ### Custom slash commands — markdown macros you fire
 Where a **skill** is something the *agent* pulls when relevant, a **custom command** is a prompt-macro
 *you* fire by name. Drop a markdown file in `~/.aizen/commands/` (global) or `./.aizen/commands/`

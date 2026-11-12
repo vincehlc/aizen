@@ -1,0 +1,147 @@
+[
+  {
+    "id": "ho-db-migrate-drops-backup",
+    "expect": "different",
+    "dropped_field": "back up the production database",
+    "existing": {
+      "key": "db-migrate-prod",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, back up the production database with pg_dump to the backups bucket, run the migration with sqlx migrate run against production, run the post-migration smoke queries, announce completion in #ops"
+    },
+    "proposal": {
+      "name": "migrate-prod-db",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, run sqlx migrate run against production, run the smoke queries afterwards, announce completion in #ops"
+    }
+  },
+  {
+    "id": "ho-db-migrate-terse-complete",
+    "expect": "same",
+    "existing": {
+      "key": "db-migrate-prod",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, back up the production database with pg_dump to the backups bucket, run the migration with sqlx migrate run against production, run the post-migration smoke queries, announce completion in #ops"
+    },
+    "proposal": {
+      "name": "migrate-prod-db",
+      "when": "apply a database migration to production",
+      "steps": "Announce in #ops, pg_dump backup, sqlx migrate run on prod, smoke queries, announce done"
+    }
+  },
+  {
+    "id": "ho-db-migrate-staging-target",
+    "expect": "different",
+    "dropped_field": "",
+    "existing": {
+      "key": "db-migrate-prod",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, back up the production database with pg_dump to the backups bucket, run the migration with sqlx migrate run against production, run the post-migration smoke queries, announce completion in #ops"
+    },
+    "proposal": {
+      "name": "migrate-staging-db",
+      "when": "apply a database migration to staging",
+      "steps": "Announce the maintenance window in #ops, back up the staging database with pg_dump to the backups bucket, run the migration with sqlx migrate run against staging, run the post-migration smoke queries, announce completion in #ops"
+    }
+  },
+  {
+    "id": "ho-db-migrate-adds-dry-run",
+    "expect": "same",
+    "existing": {
+      "key": "db-migrate-prod",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, back up the production database with pg_dump to the backups bucket, run the migration with sqlx migrate run against production, run the post-migration smoke queries, announce completion in #ops"
+    },
+    "proposal": {
+      "name": "migrate-prod-db",
+      "when": "apply a database migration to production",
+      "steps": "Announce the maintenance window in #ops, back up the production database with pg_dump to the backups bucket, run sqlx migrate info to dry-run the pending migrations, run the migration with sqlx migrate run against production, run the post-migration smoke queries, announce completion in #ops"
+    }
+  },
+  {
+    "id": "ho-vi-bao-cao-tuan-drops-gui-sep",
+    "expect": "different",
+    "dropped_field": "gửi báo cáo cho trưởng nhóm duyệt trước khi đăng",
+    "existing": {
+      "key": "bao-cao-tuan",
+      "when": "viết báo cáo tiến độ hằng tuần",
+      "steps": "Mở bảng Jira của sprint hiện tại và lọc các ticket đã đóng trong tuần, ghi lại số lượng và tên từng ticket kèm người phụ trách. Liệt kê các việc còn dở kèm lý do bị chậm và ngày dự kiến xong. Ghi rủi ro mới phát sinh và người cần hỗ trợ. Gửi bản nháp báo cáo cho trưởng nhóm duyệt trước khi đăng. Sau khi được duyệt, đăng báo cáo lên kênh #weekly và lưu một bản vào thư mục Drive của dự án."
+    },
+    "proposal": {
+      "name": "viet-bao-cao-tuan",
+      "when": "viết báo cáo tiến độ hằng tuần",
+      "steps": "Lọc ticket đã đóng trong tuần trên Jira, ghi số lượng và người phụ trách. Liệt kê việc còn dở kèm lý do và ngày dự kiến. Ghi rủi ro mới. Đăng lên #weekly và lưu bản vào Drive."
+    }
+  },
+  {
+    "id": "ho-vi-bao-cao-tuan-gon-du",
+    "expect": "same",
+    "existing": {
+      "key": "bao-cao-tuan",
+      "when": "viết báo cáo tiến độ hằng tuần",
+      "steps": "Mở bảng Jira của sprint hiện tại và lọc các ticket đã đóng trong tuần, ghi lại số lượng và tên từng ticket kèm người phụ trách. Liệt kê các việc còn dở kèm lý do bị chậm và ngày dự kiến xong. Ghi rủi ro mới phát sinh và người cần hỗ trợ. Gửi bản nháp báo cáo cho trưởng nhóm duyệt trước khi đăng. Sau khi được duyệt, đăng báo cáo lên kênh #weekly và lưu một bản vào thư mục Drive của dự án."
+    },
+    "proposal": {
+      "name": "viet-bao-cao-tuan",
+      "when": "viết báo cáo tiến độ hằng tuần",
+      "steps": "Lọc ticket đã đóng trong tuần trên Jira, ghi số lượng và người phụ trách. Liệt kê việc còn dở kèm lý do và ngày dự kiến. Ghi rủi ro mới và người cần hỗ trợ. Gửi nháp cho trưởng nhóm duyệt. Duyệt xong thì đăng lên #weekly và lưu bản vào Drive."
+    }
+  },
+  {
+    "id": "ho-vi-bao-cao-tuan-dich-anh",
+    "expect": "same",
+    "existing": {
+      "key": "bao-cao-tuan",
+      "when": "viết báo cáo tiến độ hằng tuần",
+      "steps": "Mở bảng Jira của sprint hiện tại và lọc các ticket đã đóng trong tuần, ghi lại số lượng và tên từng ticket kèm người phụ trách. Liệt kê các việc còn dở kèm lý do bị chậm và ngày dự kiến xong. Ghi rủi ro mới phát sinh và người cần hỗ trợ. Gửi bản nháp báo cáo cho trưởng nhóm duyệt trước khi đăng. Sau khi được duyệt, đăng báo cáo lên kênh #weekly và lưu một bản vào thư mục Drive của dự án."
+    },
+    "proposal": {
+      "name": "weekly-progress-report",
+      "when": "viết báo cáo tiến độ hằng tuần (weekly progress report)",
+      "steps": "Open the current sprint's Jira board and filter tickets closed this week, noting the count, each ticket and its owner. List unfinished work with the reason for the delay and the expected date. Note new risks and who needs help. Send the draft to the team lead for approval before posting. Once approved, post it to #weekly and save a copy in the project's Drive folder."
+    }
+  },
+  {
+    "id": "ho-release-replaces-equivalent",
+    "expect": "same",
+    "existing": {
+      "key": "npm-release",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm test, bump the version with npm version patch, run npm publish, push the commit and the tag to origin"
+    },
+    "proposal": {
+      "name": "publish-npm-package",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm run test:ci which runs the same test suite with the CI reporter, bump the version with npm version patch, run npm publish, push the commit and the tag to origin"
+    }
+  },
+  {
+    "id": "ho-release-replaces-not-equivalent",
+    "expect": "different",
+    "dropped_field": "run the test suite",
+    "existing": {
+      "key": "npm-release",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm test, bump the version with npm version patch, run npm publish, push the commit and the tag to origin"
+    },
+    "proposal": {
+      "name": "publish-npm-package",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm run lint which checks style with the CI reporter, bump the version with npm version patch, run npm publish, push the commit and the tag to origin"
+    }
+  },
+  {
+    "id": "ho-release-one-off-skip-tests",
+    "expect": "different",
+    "dropped_field": "",
+    "existing": {
+      "key": "npm-release",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm test, bump the version with npm version patch, run npm publish, push the commit and the tag to origin"
+    },
+    "proposal": {
+      "name": "publish-npm-package",
+      "when": "publish a new version of the npm package",
+      "steps": "Run npm ci, run npm test, bump the version with npm version patch, run npm publish --tag hotfix-1123 just this once because the registry outage blocked the normal channel, push the commit and the tag to origin"
+    }
+  }
+]

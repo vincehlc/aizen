@@ -27,6 +27,8 @@ pub mod migrate_stems;
 pub mod reflect;
 pub(crate) mod secretary;
 pub mod self_mem;
+#[cfg(test)]
+pub(crate) mod skill_overlap_eval;
 
 /// The persona gate (E4.7, quality plan M11): the costume, the character's self-memory and the
 /// agent identity cost up to ~1,900 tokens per turn and do nothing for a coding task. The REPL's
