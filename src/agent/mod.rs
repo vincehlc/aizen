@@ -12478,29 +12478,6 @@ mod tests {
         // done"), and that is exactly the shape that needs a wall clock — so the deadline check sits
         // outside the `!goal_mode` guard, and this pins that.
         let r = registry();
-        let c = AgentConfig {
-            max_iters: 50,
-            auto_extend_to: 50,
-            goal: Some("keep going".into()),
-            ..cfg()
-        };
-        // The first tool turn pays ~200 ms of one-off setup. Run it before the clock starts so a slow
-        // runner cannot land the deadline inside a tool worker (fail-closed `UnknownWorker`).
-        run_agent(
-            scripted(vec![
-                tool_turn("echo", r#"{"text":"warm"}"#),
-                final_turn("warm"),
-            ]),
-            &AgentConfig {
-                goal: None,
-                ..c.clone()
-            },
-            &r,
-            "sys",
-            "task",
-        )
-        .await
-        .unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let seen = calls.clone();
@@ -12524,8 +12501,11 @@ mod tests {
             }
         };
         let c = AgentConfig {
+            max_iters: 50,
+            auto_extend_to: 50,
+            goal: Some("keep going".into()),
             deadline: Some(deadline),
-            ..c
+            ..cfg()
         };
         let out = run_agent(chat, &c, &r, "sys", "task").await.unwrap();
         assert_eq!(
