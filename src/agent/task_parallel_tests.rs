@@ -185,6 +185,7 @@ async fn real_mixed_access(planned: bool, workflow: bool, case: AccessCase) {
     let _tape = crate::llm::replay::TAPE_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     crate::llm::replay::disable();
     std::fs::write(root.join("a.txt"), "before-a").unwrap();
     std::fs::write(root.join("b.txt"), "before-b").unwrap();
@@ -453,6 +454,7 @@ async fn real_native_dispatch_case(
     let _tape = crate::llm::replay::TAPE_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     crate::llm::replay::disable();
     std::fs::write(root.join("a.txt"), "before").unwrap();
     assert!(!root.join("b.txt").exists());

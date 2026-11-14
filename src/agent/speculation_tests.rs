@@ -361,6 +361,7 @@ async fn real_speculative_tasks(planned: bool, reader: bool, same_function: bool
     let _tape = crate::llm::replay::TAPE_LOCK
         .lock()
         .unwrap_or_else(|error| error.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     crate::llm::replay::disable();
     assert!(hooks::configured().is_none(), "owned HOME must not inherit lifecycle hooks");
     std::fs::write(root.join(FILE), SOURCE).unwrap();
