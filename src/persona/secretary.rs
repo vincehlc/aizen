@@ -518,3 +518,105 @@ pub(crate) fn final_verdict<'a>(raw: &str, offered: &[SkillView<'a>]) -> Option<
         .all(|x| x.as_str().is_some_and(|s| s.trim().is_empty()));
     nothing_missing.then_some(*confirmed)
 }
+
+#[cfg(test)]
+mod guard_tests {
+    use super::*;
+
+    const STEP: &str = "dịch từng đoạn sang tiếng Anh, giữ nguyên định dạng markdown. ";
+
+    /// `STEP` repeated until the field weighs at least `units` (same tokens, so it still
+    /// overlaps lexically with a short proposal built from `STEP`).
+    fn body(min_units: usize) -> String {
+        let mut s = String::new();
+        while judge_field_units(&s) < min_units {
+            s.push_str(STEP);
+        }
+        s
+    }
+
+    /// A proposal in `existing`'s words at ~20% of its length: clears the 15% floor against it.
+    fn proposal_for(existing: &str) -> String {
+        STEP.repeat(collapsed_char_len(existing) / 5 / collapsed_char_len(STEP) + 1)
+    }
+
+    fn view<'a>(key: &'a str, steps: &'a str) -> SkillView<'a> {
+        SkillView {
+            key,
+            when: "Khi người dùng muốn dịch tài liệu",
+            steps,
+            origin: SkillOrigin::Global,
+        }
+    }
+
+    #[test]
+    fn a_field_over_budget_is_never_offered() {
+        let huge = body(JUDGE_FIELD_UNITS + 1);
+        let skills = [view("huge", &huge), view("short", STEP)];
+        // The proposal clears the floor against `huge`, so only the field budget can drop it.
+        let proposal = proposal_for(&huge);
+        let offered: Vec<_> =
+            offer_candidates(&skills, "Khi người dùng muốn dịch tài liệu", &proposal)
+                .iter()
+                .map(|s| s.key)
+                .collect();
+        assert_eq!(offered, ["short"]);
+        // A proposal over budget is never judged at all.
+        assert!(offer_candidates(&skills, "Khi người dùng muốn dịch tài liệu", &huge).is_empty());
+    }
+
+    #[test]
+    fn a_smaller_candidate_after_one_over_the_call_budget_is_still_offered() {
+        let when = "Khi người dùng muốn dịch tài liệu";
+        let c1 = body(99_000);
+        // c2: c1 padded with '.' (no tokens) to just under the FIELD budget, so it passes the
+        // per-field guard and only the CALL budget can drop it.
+        let mut c2 = c1.clone();
+        while judge_field_units(&c2) + 9 <= JUDGE_FIELD_UNITS {
+            c2.push('.');
+        }
+        assert!(fits_judge("Khi người dùng muốn dịch tài liệu", &c2));
+        // c3 shares STEP's words plus others, so it scores BELOW c1/c2 and is ranked last.
+        let c3 =
+            format!("{STEP} rồi kiểm tra chính tả, báo người dùng đường dẫn và tạo commit riêng");
+        let skills = [view("c1", &c1), view("c2", &c2), view("c3", &c3)];
+        let cost = |s: &str| judge_field_units(when) + judge_field_units(s);
+        // Clears the floor against c1/c2 (~99k units) and is paid for in the call budget.
+        let steps = proposal_for(&c1);
+        let proposal = judge_field_units(when) + judge_field_units(&steps);
+        // Preconditions of the scenario: c1 fits, c2 then overflows, c3 still fits.
+        assert!(proposal + cost(&c1) <= JUDGE_CALL_UNITS);
+        assert!(proposal + cost(&c1) + cost(&c2) > JUDGE_CALL_UNITS);
+        assert!(proposal + cost(&c1) + cost(&c3) <= JUDGE_CALL_UNITS);
+        let ranked: Vec<_> = overlap_candidates(&skills, when, &steps)
+            .iter()
+            .map(|s| s.key)
+            .collect();
+        assert_eq!(ranked, ["c1", "c2", "c3"], "c3 must be ranked after c2");
+        let offered: Vec<_> = offer_candidates(&skills, when, &steps)
+            .iter()
+            .map(|s| s.key)
+            .collect();
+        assert_eq!(offered, ["c1", "c3"]);
+    }
+
+    /// The budget counts the text as the judge receives it: 8,000 quotes weigh 72,000 raw units
+    /// (under the field budget) but about 144,000 once every quote is escaped as `\"`, so that skill
+    /// is never offered.
+    #[test]
+    fn a_field_that_grows_over_budget_when_encoded_is_never_offered() {
+        let quotes = "\"".repeat(8_000);
+        assert!(
+            units(&quotes) <= JUDGE_FIELD_UNITS,
+            "precondition: raw fits"
+        );
+        let skills = [view("quoted", &quotes), view("plain", STEP)];
+        let proposal = STEP.repeat(30);
+        let offered: Vec<_> =
+            offer_candidates(&skills, "Khi người dùng muốn dịch tài liệu", &proposal)
+                .iter()
+                .map(|s| s.key)
+                .collect();
+        assert_eq!(offered, ["plain"]);
+    }
+}
