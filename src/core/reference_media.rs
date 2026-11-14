@@ -644,6 +644,7 @@ mod tests {
     }
     #[test]
     fn bounds_derivatives_and_crop_lineage_are_enforced() {
+        let _lock = crate::llm::image_send::image_test_lock();
         let registry = ReferenceRegistry::new("owner");
         let mut messages = vec![attachment()];
         let id = registry.register_loaded(&mut messages).unwrap()[0]

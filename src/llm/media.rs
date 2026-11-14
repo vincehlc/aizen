@@ -1798,6 +1798,7 @@ pub(crate) mod tests {
 
     #[test]
     fn live_pinned_tool_occurrence_wins_over_newer_optional_images() {
+        let _guard = crate::llm::image_send::image_test_lock();
         let destination = "a".repeat(64);
         let mut messages = Vec::new();
         for i in 0..6 {
