@@ -553,6 +553,10 @@ mod tests {
 
     #[test]
     fn broad_workspaces_are_flagged() {
+        // Fixtures (e.g. `embed::IsolatedModelEnv`) unset HOME/USERPROFILE: `home_dir()` becomes ".".
+        let _g = crate::core::config::TEST_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         #[cfg(windows)]
         {
             assert!(workspace_too_broad(Path::new("C:\\")));
