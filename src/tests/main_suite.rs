@@ -405,6 +405,7 @@ async fn a_chore_call_against_a_silent_gateway_returns_err_not_a_permanent_park(
     let _g = crate::core::config::TEST_HOME_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     const K: &str = "AIZEN_SUBAGENT_CALL_SECS";
     let prior = std::env::var(K).ok();
     std::env::set_var(K, "1");

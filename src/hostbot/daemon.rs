@@ -1757,9 +1757,14 @@ mod tests {
     /// A stub gateway stands in for the provider (same pattern as `llm::client`'s tests) — no real
     /// LLM, no Telegram. It captures the request body and hands back a minimal valid completion.
     #[tokio::test]
+    #[expect(
+        clippy::await_holding_lock,
+        reason = "Serialize against tests that exhaust the process-wide image budget; the stub gateway never takes this lock"
+    )]
     async fn the_lane_model_is_what_lands_in_the_chat_completions_body() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+        let _images = crate::llm::image_send::image_test_lock();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let base = format!("http://{}/v1", listener.local_addr().unwrap());
         let (seen_tx, seen_rx) = std::sync::mpsc::channel::<String>();
