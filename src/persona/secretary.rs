@@ -382,11 +382,10 @@ fn fits_judge(when: &str, steps: &str) -> bool {
 
 /// What the judge is offered, and the only place that decides it. A skill must be seen WHOLE
 /// (per-field budget) and pass the length floor to be a candidate at all; that is decided BEFORE
-/// ranking, so a skill that
-/// could never be refined cannot push the right one out of the top [`MAX_OVERLAP_CANDIDATES`].
-/// What survives is then ranked, and cut best first to [`JUDGE_CALL_UNITS`]. Empty means no
-/// judge call, which includes a proposal that does not fit itself. The caller passes only
-/// skills auto-learn may write (never repo-shipped ones).
+/// ranking, so a skill that could never be refined cannot push the right one out of the top
+/// [`MAX_OVERLAP_CANDIDATES`]. What survives is then ranked, and cut best first to
+/// [`JUDGE_CALL_UNITS`]. Empty means no judge call, which includes a proposal that does not fit
+/// itself. The caller passes only skills auto-learn may write (never repo-shipped ones).
 pub(crate) fn offer_candidates<'a>(
     skills: &[SkillView<'a>],
     when: &str,

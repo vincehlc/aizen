@@ -1498,8 +1498,8 @@ independent of persistent Memory and `memory_auto_learn`. Toggle in `/config` (d
 
 **Refinement gate.** Lexical similarity only shortlists; it never refines by itself. A skill is
 dropped from the shortlist if it is repo-shipped (read-only), too large for the judge to see
-whole (measured on the encoded text it is sent as), or more than ~6.7x longer than the proposal (the proposal is under 15% of its steps,
-whitespace-collapsed); at most three of the rest are offered, within one call budget. If nothing is
+whole (measured on the encoded text it is sent as), or more than ~6.7x longer than the proposal
+(the proposal is under 15% of its steps, whitespace-collapsed); at most three of the rest are offered, within one call budget. If nothing is
 left there is no judge call and the proposal is saved as new. A chore-model judge must name an
 offered skill as the same procedure and list every important step the proposal lacks; code refines
 only when the named skill is offered and that list is empty. Anything else (no answer, malformed, a
