@@ -1489,11 +1489,29 @@ GitHub bundle when a skill needs sibling resources. Marketplace search remains b
 recent-catalogue fallback cannot recover every older skill during an index outage.
 
 **Self-learning** — after a completed multi-step task, the REPL distills a *generalizable* procedure
-into a new skill automatically (conservative: skips one-offs and duplicates; prints `↯ learned skill
-'…'`). It fires when a turn did real work (**≥4 tool calls**) **or recovered from a dead end** (a tool
+into a new skill automatically (conservative: skips one-offs; refines a merely similar skill only when a
+judge confirms it is the same procedure; prints `↯ learned skill '…'` or `↯ refined skill '…'`). It
+fires when a turn did real work (**≥4 tool calls**) **or recovered from a dead end** (a tool
 errored, then a later call succeeded — that hard-won path is worth saving). This Core policy is
 independent of persistent Memory and `memory_auto_learn`. Toggle in `/config` (default on) or
 `aizen config set --auto-skill-learn false`.
+
+**Refinement gate.** Lexical similarity only shortlists; it never refines by itself. A skill is
+dropped from the shortlist if it is repo-shipped (read-only), too large for the judge to see
+whole (measured on the encoded text it is sent as), or more than ~6.7x longer than the proposal
+(the proposal is under 15% of its steps, whitespace-collapsed); at most three of the rest are offered, within one call budget. If nothing is
+left there is no judge call and the proposal is saved as new. A chore-model judge must name an
+offered skill as the same procedure and list every important step the proposal lacks; code refines
+only when the named skill is offered and that list is empty. Anything else (no answer, malformed, a
+non-empty list, an unknown name) saves the proposal as new. The judge's input is JSON-encoded, so
+skill text cannot forge extra entries. After the judge answers the store is read again: if
+auto-learn was switched off nothing is written; if the proposal's exact name now exists the
+exact-name rule applies; if the judged skill was changed, removed or now hidden by a same-text copy
+in another zone, the proposal is dropped. A proposal that names an existing skill exactly refines it
+only when it explicitly asks to (`action: refine`) **and** its steps pass the same 15% length floor
+against the stored ones; a repo-shipped skill is never refined. A refine that fails to write drops
+the proposal (it is not saved as new) and the failure is reported. Known gap: a skill edited in the
+milliseconds between that second read and the write can still be overwritten by a refine.
 
 ### Custom slash commands — markdown macros you fire
 Where a **skill** is something the *agent* pulls when relevant, a **custom command** is a prompt-macro

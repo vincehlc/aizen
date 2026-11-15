@@ -2,6 +2,7 @@
 // Contract/golden tests for the Core identity-only extraction slice.
 use crate::core::{frontmatter, tokens, turn_signals};
 use crate::persona::secretary::*;
+use crate::skills::SkillOrigin;
 
 const BOTH: IdentityLearning = IdentityLearning {
     skills: true,
@@ -278,48 +279,49 @@ fn dedup_targets_install_keys_not_display_names() {
         key: "local-alias",
         when: "verify the build",
         steps: "Run cargo test before release.",
+        origin: SkillOrigin::Global,
     };
     let other = SkillView {
         key: "another-copy",
         when: "deploy documentation",
         steps: "Publish the documentation site.",
+        origin: SkillOrigin::Global,
     };
     let skills = [other, aliased];
-    assert_eq!(
-        auto_learn_skill_target(&skills, "local-alias", "", ""),
-        Some(("local-alias", true))
-    );
-    assert_eq!(
-        auto_learn_skill_target(&skills, "upstream", aliased.when, aliased.steps),
-        Some(("local-alias", false))
-    );
-    assert_eq!(
-        auto_learn_skill_target(&skills, "another-copy", "", ""),
-        Some(("another-copy", true))
-    );
-    assert_eq!(auto_learn_skill_target(&skills, "upstream", "", ""), None);
+    let target = |key| auto_learn_skill_target(&skills, key).map(|s| s.key);
+    assert_eq!(target("local-alias"), Some("local-alias"));
+    assert_eq!(target("another-copy"), Some("another-copy"));
+    // A display name is never an exact target; similarity yields the INSTALL key as a candidate.
+    assert_eq!(target("upstream"), None);
+    let keys: Vec<_> = overlap_candidates(&skills, aliased.when, aliased.steps)
+        .iter()
+        .map(|s| s.key)
+        .collect();
+    assert_eq!(keys, ["local-alias"]);
 }
 
 #[test]
-fn exact_collision_wins_and_fuzzy_dedup_requires_both_axes() {
+fn exact_collision_wins_and_fuzzy_candidate_needs_either_axis() {
     let a = SkillView {
         key: "first",
         when: "verify the build",
         steps: "Run cargo test before release.",
+        origin: SkillOrigin::Global,
     };
     let b = SkillView { key: "exact", ..a };
     assert_eq!(
-        auto_learn_skill_target(&[a, b], "exact", a.when, a.steps),
-        Some(("exact", true))
+        auto_learn_skill_target(&[a, b], "exact").map(|s| s.key),
+        Some("exact")
     );
-    assert_eq!(
-        auto_learn_skill_target(&[a], "new", a.when, "Publish a documentation website"),
-        None
-    );
-    assert_eq!(
-        auto_learn_skill_target(&[a], "new", "Deploy a documentation website", a.steps),
-        None
-    );
+    assert_eq!(auto_learn_skill_target(&[a], "new"), None);
+    // One axis only SHORTLISTS (the judge decides before any refine), so it is a candidate.
+    let shortlisted = |when, steps| !overlap_candidates(&[a], when, steps).is_empty();
+    assert!(shortlisted(a.when, "Publish a documentation website"));
+    assert!(shortlisted("Deploy a documentation website", a.steps));
+    assert!(!shortlisted(
+        "Deploy a documentation website",
+        "Publish the docs site"
+    ));
 }
 
 #[test]
