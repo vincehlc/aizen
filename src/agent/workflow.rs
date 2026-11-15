@@ -3852,7 +3852,7 @@ mod native_speculation_acceptance {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    #[allow(clippy::await_holding_lock)] // HOME, then tape; retain until actual workers settle.
+    #[allow(clippy::await_holding_lock)] // HOME, tape, then image budget; retain until workers settle.
     async fn speculative_real_workflow_same_file_bodies_overlap_and_dependencies_wait_for_verify() {
         let _home_lock = crate::core::config::TEST_HOME_LOCK
             .lock()
@@ -3877,6 +3877,7 @@ mod native_speculation_acceptance {
         let _tape = crate::llm::replay::TAPE_LOCK
             .lock()
             .unwrap_or_else(|error| error.into_inner());
+        let _images = crate::llm::image_send::image_test_lock();
         crate::llm::replay::disable();
         assert!(crate::agent::hooks::configured().is_none());
         std::fs::write(root.join(FILE), SOURCE).unwrap();
