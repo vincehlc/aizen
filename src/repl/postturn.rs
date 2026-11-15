@@ -12,6 +12,7 @@ use crate::core::types::ToolDef;
 use crate::core::{cli_config, types};
 use crate::llm::client;
 use crate::persona;
+use crate::persona::secretary::{self, SkillAction, SkillView};
 use crate::skills as skill;
 use crate::ui::{icons, splash, tui};
 use crate::{
@@ -102,7 +103,6 @@ pub(crate) async fn maybe_run_secretary(
     model: &str,
 ) {
     use crate::core::turn_signals;
-    use crate::persona::secretary;
 
     let skills_enabled = auto_skill_learn_enabled();
     let evolve_enabled = persona_evolve_enabled();
@@ -167,27 +167,21 @@ pub(crate) async fn maybe_run_secretary(
         }
     }
     if let Some(proposal) = output.skill.as_ref().filter(|_| auto_skill_learn_enabled()) {
-        let all_skills = skill::list();
-        let target =
-            auto_learn_skill_target(&all_skills, &proposal.name, &proposal.when, &proposal.steps);
-        let done = match target {
-            Some((key, true)) => {
-                proposal.refine
-                    && skill::refine(key, &proposal.steps, None, Some(&proposal.when)).is_ok()
+        let first = skill::list();
+        // Repo-shipped skills are read-only here: visible to the exact-key check, never judged.
+        let exact = secretary::auto_learn_skill_target(
+            &skill_views(&first, false),
+            &skill::sanitize_name(&proposal.name),
+        );
+        // A lexical match only shortlists; the judge decides, and any failure keeps both skills.
+        let judged = match exact {
+            Some(_) => None,
+            None => {
+                let writable = skill_views(&first, true);
+                judge_same_skill(http, &ep, &writable, &proposal.when, &proposal.steps).await
             }
-            Some((key, false)) => {
-                skill::refine(key, &proposal.steps, None, Some(&proposal.when)).is_ok()
-            }
-            None => skill::save_scoped(&proposal.name, "", &proposal.when, &proposal.steps, true)
-                .is_ok(),
         };
-        if done {
-            let label = if target.is_some() {
-                "refined"
-            } else {
-                "learned"
-            };
-            let name = target.map(|(key, _)| key).unwrap_or(&proposal.name);
+        if let Some((label, name)) = apply_skill_proposal(proposal, judged) {
             tui::emit_line(
                 &style(format!(
                     "{}{label} skill '{name}' — /skills to view",
@@ -200,24 +194,83 @@ pub(crate) async fn maybe_run_secretary(
     }
 }
 
-/// Return the install key and whether it is an exact identity match; upstream names are display
-/// metadata, so they must not choose the filesystem target of automatic refinement.
-fn auto_learn_skill_target<'a>(
-    skills: &'a [skill::Skill],
-    name: &str,
-    when: &str,
-    steps: &str,
-) -> Option<(&'a str, bool)> {
-    use crate::persona::secretary;
-    let views: Vec<_> = skills
+/// Write what the judge decided, against a FRESH read of the store: learning passes are detached
+/// and the judge await can take a minute, so `judged` (the skill as the judge saw it) may be
+/// stale. Returns the visible label and skill name when something was written. Known gap: a skill
+/// edited in the milliseconds between this read and the write is still overwritten by a refine.
+fn apply_skill_proposal(
+    proposal: &secretary::SkillProposal,
+    judged: Option<SkillView>,
+) -> Option<(&'static str, String)> {
+    let fresh = skill::list();
+    let key = skill::sanitize_name(&proposal.name);
+    let action = secretary::recheck_after_judge(
+        auto_skill_learn_enabled(),
+        &skill_views(&fresh, false),
+        &key,
+        &proposal.steps,
+        judged,
+        proposal.refine,
+    );
+    match action {
+        SkillAction::Refine(view) => {
+            match skill::refine(view.key, &proposal.steps, None, Some(&proposal.when)) {
+                Ok(_) => Some(("refined", view.key.to_string())),
+                Err(e) => {
+                    // Dropped, not saved as new: that would hide the failure and duplicate the skill.
+                    tui::note_line(&format!(
+                        "auto-learn refine failed for '{}': {e:#}",
+                        view.key
+                    ));
+                    None
+                }
+            }
+        }
+        SkillAction::Save => {
+            skill::save_scoped(&proposal.name, "", &proposal.when, &proposal.steps, true)
+                .ok()
+                .map(|_| ("learned", proposal.name.clone()))
+        }
+        SkillAction::Skip => None,
+    }
+}
+
+/// `writable_only` drops repo-shipped skills, which auto-learn never refines.
+fn skill_views(skills: &[skill::Skill], writable_only: bool) -> Vec<SkillView<'_>> {
+    skills
         .iter()
-        .map(|skill| secretary::SkillView {
+        .filter(|skill| !writable_only || skill.origin != skill::SkillOrigin::Repo)
+        .map(|skill| SkillView {
             key: skill.key(),
             when: &skill.when,
             steps: &skill.body,
+            origin: skill.origin,
         })
-        .collect();
-    secretary::auto_learn_skill_target(&views, &skill::sanitize_name(name), when, steps)
+        .collect()
+}
+
+/// Ask the chore model whether a proposal is the same procedure as a lexically similar skill;
+/// returns that skill as the judge saw it. `None` means save as new — and no call at all when
+/// nothing fits the judge budget or every candidate fails the length floor.
+async fn judge_same_skill<'a>(
+    http: &reqwest::Client,
+    ep: &cli_config::ResolvedEndpoint,
+    views: &[SkillView<'a>],
+    when: &str,
+    steps: &str,
+) -> Option<SkillView<'a>> {
+    let offered = secretary::offer_candidates(views, when, steps);
+    if offered.is_empty() {
+        return None;
+    }
+    let messages = [
+        Message::system(secretary::same_skill_prompt()),
+        Message::user(secretary::build_same_skill_input(when, steps, &offered)),
+    ];
+    let reply = chore_chat(http, &ep.base_url, &ep.api_key, &ep.model, &messages, &[])
+        .await
+        .ok()?;
+    secretary::final_verdict(&reply.content.unwrap_or_default(), &offered)
 }
 
 /// Did this turn RECOVER from a dead end — a tool result errored, then a LATER tool result in the
@@ -603,19 +656,29 @@ mod learning_tests {
         );
         other.slug = "another-copy".into();
         let skills = [other, aliased];
+        let views = skill_views(&skills, false);
+        // `when` tells the two apart: `other` carries the display name `local-alias`.
+        let exact = |name| {
+            secretary::auto_learn_skill_target(&views, &skill::sanitize_name(name))
+                .map(|s| (s.key, s.when))
+        };
         assert_eq!(
-            auto_learn_skill_target(&skills, "local-alias", "", ""),
-            Some(("local-alias", true))
+            exact("local-alias"),
+            Some(("local-alias", "verify the build"))
         );
         assert_eq!(
-            auto_learn_skill_target(&skills, "upstream", &skills[1].when, &skills[1].body),
-            Some(("local-alias", false))
+            exact("another-copy"),
+            Some(("another-copy", "deploy documentation"))
         );
-        assert_eq!(
-            auto_learn_skill_target(&skills, "another-copy", "", ""),
-            Some(("another-copy", true))
-        );
-        assert_eq!(auto_learn_skill_target(&skills, "upstream", "", ""), None);
+        // `upstream` is only display metadata: never an exact target, at most a judge candidate
+        // reported under its install key.
+        assert_eq!(exact("upstream"), None);
+        let candidates: Vec<_> =
+            secretary::overlap_candidates(&views, &skills[1].when, &skills[1].body)
+                .iter()
+                .map(|s| s.key)
+                .collect();
+        assert_eq!(candidates, ["local-alias"]);
     }
 
     #[test]
@@ -624,3 +687,7 @@ mod learning_tests {
         assert!(chore_call_timeout() <= CHORE_CALL_TIMEOUT);
     }
 }
+
+#[cfg(test)]
+#[path = "skill_learn_tests.rs"]
+mod skill_learn_tests;
