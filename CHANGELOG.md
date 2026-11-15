@@ -14,8 +14,8 @@ development log lives in that monorepo's history.
   judge must confirm it is the same procedure and that the proposal keeps every important step;
   a failed, malformed or doubtful judgement saves the proposal as a new skill. A proposal that
   names an existing skill exactly and asks to refine it skips the judge and is guarded only by
-  the 15% floor and a repo-shipped check. The store is read again after the judge, so a stale
-  verdict never overwrites a skill changed meanwhile. A refine that fails to write drops the
+  the 15% floor and a repo-shipped check. The store is read again after the judge, so a
+  verdict that went stale during the judge call is dropped. A refine that fails to write drops the
   proposal and reports it. Known gap: a skill edited in the milliseconds between that second read
   and the write can still be overwritten.
 
