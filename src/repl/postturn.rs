@@ -250,8 +250,8 @@ fn skill_views(skills: &[skill::Skill], writable_only: bool) -> Vec<SkillView<'_
 }
 
 /// Ask the chore model whether a proposal is the same procedure as a lexically similar skill;
-/// returns that skill as the judge saw it. `None` means save as new — and no call at all when
-/// nothing fits the judge budget or every candidate fails the length floor.
+/// returns that skill as the judge saw it. `None` means no confirmed candidate — and no call at
+/// all when nothing fits the judge budget or every candidate fails the length floor.
 async fn judge_same_skill<'a>(
     http: &reqwest::Client,
     ep: &cli_config::ResolvedEndpoint,
