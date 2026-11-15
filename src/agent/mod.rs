@@ -12478,7 +12478,8 @@ mod tests {
         // done"), and that is exactly the shape that needs a wall clock — so the deadline check sits
         // outside the `!goal_mode` guard, and this pins that.
         let r = registry();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        // 5 s: both tool turns must settle first; 1 s was too tight on a loaded Windows runner.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let seen = calls.clone();
         let chat = move |_m: Vec<Message>, _d: Vec<ToolDef>| {

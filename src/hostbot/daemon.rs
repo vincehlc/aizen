@@ -1757,6 +1757,10 @@ mod tests {
     /// A stub gateway stands in for the provider (same pattern as `llm::client`'s tests) — no real
     /// LLM, no Telegram. It captures the request body and hands back a minimal valid completion.
     #[tokio::test]
+    #[expect(
+        clippy::await_holding_lock,
+        reason = "Serialize against tests that exhaust the process-wide image budget; the stub gateway never takes this lock"
+    )]
     async fn the_lane_model_is_what_lands_in_the_chat_completions_body() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -1800,6 +1804,8 @@ mod tests {
         };
         assert_eq!(model, "lane-pinned-model");
 
+        // After the home lock is released (lock order: see `image_test_lock`).
+        let _images = crate::llm::image_send::image_test_lock();
         let http = reqwest::Client::new();
         let _ = crate::llm::client::chat_with_tools_effort(
             &http,

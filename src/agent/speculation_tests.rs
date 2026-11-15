@@ -338,7 +338,7 @@ fn configure_verification(root: &Path, expected: &str) -> String {
     command.into()
 }
 
-#[allow(clippy::await_holding_lock)] // Fixture HOME, then replay; retained until real workers settle.
+#[allow(clippy::await_holding_lock)] // Fixture HOME, then replay, then image budget; retained until real workers settle.
 async fn real_speculative_tasks(planned: bool, reader: bool, same_function: bool) {
     let _home_lock = crate::core::config::TEST_HOME_LOCK
         .lock()
@@ -361,6 +361,7 @@ async fn real_speculative_tasks(planned: bool, reader: bool, same_function: bool
     let _tape = crate::llm::replay::TAPE_LOCK
         .lock()
         .unwrap_or_else(|error| error.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     crate::llm::replay::disable();
     assert!(hooks::configured().is_none(), "owned HOME must not inherit lifecycle hooks");
     std::fs::write(root.join(FILE), SOURCE).unwrap();

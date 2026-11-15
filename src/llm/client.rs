@@ -3402,6 +3402,10 @@ mod extension_tests;
 
 #[cfg(test)]
 pub(crate) mod tests {
+    #![expect(
+        clippy::await_holding_lock,
+        reason = "Serialize against tests that exhaust the process-wide image budget; loopback servers never take this lock"
+    )]
     use super::*;
     use crate::core::types::FunctionDelta;
 
@@ -3537,6 +3541,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn chat_raw_limit_and_malformed_are_not_replayed_or_tool_salvaged() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::with_image_delivery;
         const TOOL: &[u8] = b"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}}]}}]}\n\n";
         const FINISH: &[u8] = b"data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\ndata: [DONE]\n\n";
@@ -3602,6 +3607,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn plain_chat_raw_limit_and_malformed_fail_closed() {
+        let _images = crate::llm::image_send::image_test_lock();
         for limit in [false, true] {
             let reply = if limit {
                 raw_limit_reply(b"", b"data: [DONE]\n\n")
@@ -3813,6 +3819,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn quiet_chat_usage_observer_reports_latest_once_on_success_and_failure() {
+        let _images = crate::llm::image_send::image_test_lock();
         const PREFIX: &str = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"private reasoning\"}}],\"usage\":{\"prompt_tokens\":5,\"completion_tokens\":1}}\n\ndata: {\"choices\":[{\"delta\":{}}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":3}}\n\n";
         for (ending, success) in [
             ("data: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n", true),
@@ -5099,6 +5106,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn quiet_stream_only_receiver_preserves_effort_and_validates_finish() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::tests as media_tests;
         const REPLY: &str = "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"private reasoning\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"answer\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":3,\"completion_tokens\":2}}\n\ndata: [DONE]\n\n";
         let (base, receiver, server) =
@@ -5180,6 +5188,7 @@ pub(crate) mod tests {
     /// A healthy delegated step is untouched by the shared budget: one send, one answer.
     #[tokio::test]
     async fn a_healthy_delegated_step_still_spends_exactly_one_send() {
+        let _images = crate::llm::image_send::image_test_lock();
         use std::sync::{Arc, Mutex};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         const REPLY: &str = "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n";
@@ -5234,6 +5243,7 @@ pub(crate) mod tests {
     /// blank replays, never an unbounded retry storm.
     #[tokio::test]
     async fn metadata_only_stream_never_completes_a_turn() {
+        let _images = crate::llm::image_send::image_test_lock();
         use std::sync::{Arc, Mutex};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         const PINGS: &str = "data: {\"type\":\"ping\"}\n\ndata: {}\n\ndata: {\"choices\":[]}\n\ndata: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"\"}}]}\n\n";
@@ -5289,6 +5299,7 @@ pub(crate) mod tests {
     /// a protocol mismatch: it must be reported, not silently parsed as an empty answer.
     #[tokio::test]
     async fn a_foreign_dialect_is_a_protocol_error_not_an_empty_answer() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::tests as media_tests;
         for reply in [
             "data: {\"type\":\"message_start\",\"message\":{\"id\":\"m\",\"content\":[]}}\n\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hi\"}}\n\ndata: {\"type\":\"message_stop\"}\n\n",
@@ -5319,6 +5330,7 @@ pub(crate) mod tests {
     /// late error, instead of either waiting a whole response window or declaring success instantly.
     #[tokio::test]
     async fn finish_reason_with_an_open_connection_waits_only_a_bounded_trailer() {
+        let _images = crate::llm::image_send::image_test_lock();
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         for (tail, expect_ok) in [
             ("", true),
@@ -5371,6 +5383,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn quiet_stream_rejects_partial_eof_sse_errors_and_incomplete_calls() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::tests as media_tests;
         for (reply, expected) in [
             ("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n", "partial EOF"),
@@ -5390,6 +5403,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn non_json_error_event_cannot_be_erased_by_later_finish_or_done() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::{tests as media_tests, with_image_delivery};
         for reply in [
             "event: error\ndata: sk-secret data:image/png;base64,PRIVATE\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"later\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n\n",
@@ -5414,6 +5428,7 @@ pub(crate) mod tests {
 
     #[tokio::test]
     async fn salvaged_chat_tools_clear_live_image_receipt() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::{tests as media_tests, with_image_delivery, ImageDeliveryReceipt};
         const REPLY: &str = "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"read\",\"arguments\":\"{}\"}}]}}]}\n\n";
         let (base, receiver, server) =

@@ -928,6 +928,7 @@ mod tests {
     }
     #[test]
     fn mime_truncation_bomb_and_crop_bounds() {
+        let _lock = crate::llm::image_send::image_test_lock();
         let image = image();
         let bytes = image.bytes().unwrap();
         assert!(
@@ -991,6 +992,7 @@ mod tests {
 
     #[test]
     fn jpeg_roi_is_lossless_relative_to_decoded_original_and_never_mutates_source() {
+        let _lock = crate::llm::image_send::image_test_lock();
         use image::{codecs::jpeg::JpegEncoder, ImageDecoder};
         let mut jpeg = Vec::new();
         let pixels = [120, 20, 30].repeat(16 * 12);

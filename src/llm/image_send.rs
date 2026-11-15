@@ -19,6 +19,7 @@ const CODEC_VERSION: u8 = 1;
 pub const IMAGE_MEMORY_BUDGET: usize = 192 * 1024 * 1024;
 static IMAGE_MEMORY_USED: AtomicUsize = AtomicUsize::new(0);
 
+/// Serializes tests that draw on `IMAGE_MEMORY_BUDGET`. Take it after `TEST_HOME_LOCK` / `TAPE_LOCK`.
 #[cfg(test)]
 pub(crate) fn image_test_lock() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: Mutex<()> = Mutex::new(());
