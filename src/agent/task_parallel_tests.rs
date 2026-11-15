@@ -165,7 +165,7 @@ async fn real_mixed_roles_in_workflow_native_bodies() {
     }
 }
 
-#[allow(clippy::await_holding_lock)] // Fixture-owned HOME, then tape, through actual settlement.
+#[allow(clippy::await_holding_lock)] // Fixture-owned HOME, then tape, then image budget, through actual settlement.
 async fn real_mixed_access(planned: bool, workflow: bool, case: AccessCase) {
     let _home = crate::core::config::TEST_HOME_LOCK
         .lock()
@@ -428,7 +428,7 @@ async fn real_native_dispatch(bind_at_boundary: bool, workflow: bool, same_file:
     real_native_dispatch_case(bind_at_boundary, workflow, same_file, false, false).await;
 }
 
-#[allow(clippy::await_holding_lock)] // Owned HOME, then tape; held until all real workers settle.
+#[allow(clippy::await_holding_lock)] // Owned HOME, then tape, then image budget; held until all real workers settle.
 async fn real_native_dispatch_case(
     bind_at_boundary: bool,
     workflow: bool,

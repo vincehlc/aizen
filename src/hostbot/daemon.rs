@@ -1804,7 +1804,7 @@ mod tests {
         };
         assert_eq!(model, "lane-pinned-model");
 
-        // Taken after TEST_HOME_LOCK is released: everywhere else the order is home lock first.
+        // After the home lock is released (lock order: see `image_test_lock`).
         let _images = crate::llm::image_send::image_test_lock();
         let http = reqwest::Client::new();
         let _ = crate::llm::client::chat_with_tools_effort(
