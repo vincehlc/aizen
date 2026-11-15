@@ -573,6 +573,7 @@ fn every_labeled_duplicate_reaches_the_judge() {
     #[derive(serde::Deserialize)]
     struct Case {
         id: String,
+        expect: String,
         existing: Text,
         proposal: Text,
     }
@@ -580,6 +581,11 @@ fn every_labeled_duplicate_reaches_the_judge() {
         serde_json::from_str(include_str!("../persona/testdata/skill_overlap_cases.json")).unwrap();
     assert_eq!(cases.len(), 8);
     for c in &cases {
+        assert_eq!(
+            c.expect, "same",
+            "{}: this file holds duplicates only",
+            c.id
+        );
         let existing = SkillView {
             key: &c.existing.key,
             when: &c.existing.when,
@@ -592,6 +598,46 @@ fn every_labeled_duplicate_reaches_the_judge() {
             1,
             "{}: a duplicate must reach the judge",
             c.id
+        );
+    }
+}
+
+/// The other side of the shortlist: a skill that shares neither trigger nor steps with the
+/// proposal is not offered, so no judge call is spent on it.
+#[test]
+fn an_unrelated_skill_is_not_offered_to_the_judge() {
+    let existing = [
+        (
+            "release-check",
+            "Before publishing a release",
+            "Run cargo fmt, cargo clippy, cargo test --bin aizen, then cargo build --release",
+        ),
+        (
+            "dich-tieng-anh",
+            "Khi người dùng muốn dịch tài liệu sang tiếng Anh",
+            "Đọc file gốc, dịch từng đoạn sang tiếng Anh, giữ nguyên định dạng markdown",
+        ),
+    ]
+    .map(|(key, when, steps)| SkillView {
+        key,
+        when,
+        steps,
+        origin: skill::SkillOrigin::Global,
+    });
+    for (when, steps) in [
+        (
+            "Khi cần sao lưu cơ sở dữ liệu hằng tuần",
+            "Dừng dịch vụ, chạy pg_dump ra thư mục backup, nén lại, khởi động lại dịch vụ",
+        ),
+        (
+            "When a customer asks for a refund",
+            "Look up the order, confirm the payment method, issue the refund, email the receipt",
+        ),
+    ] {
+        assert_eq!(
+            secretary::offer_candidates(&existing, when, steps),
+            [],
+            "{when}"
         );
     }
 }

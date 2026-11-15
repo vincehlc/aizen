@@ -366,6 +366,9 @@ const JUDGE_FIELD_UNITS: usize = 100_000;
 /// candidates are kept best first while they fit; one left out is never refined.
 const JUDGE_CALL_UNITS: usize = 200_000;
 
+/// A judge reply longer than this is not parsed; the proposal is saved as new.
+const JUDGE_REPLY_MAX_BYTES: usize = 64 * 1024;
+
 /// A field's weight against [`JUDGE_FIELD_UNITS`] (the same weighting `build_input` uses), counted
 /// on the ENCODED text the judge is sent: quotes and newlines grow when escaped.
 pub(crate) fn judge_field_units(t: &str) -> usize {
@@ -398,7 +401,7 @@ pub(crate) fn offer_candidates<'a>(
     let mut used = judge_field_units(when) + judge_field_units(steps);
     let eligible: Vec<SkillView<'a>> = skills
         .iter()
-        .filter(|s| fits_judge(s.when, s.steps) && refine_floor_passes(steps, s.steps))
+        .filter(|s| refine_floor_passes(steps, s.steps) && fits_judge(s.when, s.steps))
         .copied()
         .collect();
     let mut offered = Vec::new();
@@ -504,7 +507,7 @@ pub(crate) fn recheck_after_judge<'a>(
 /// ignored), a null or invented key, or a reply over 64 KiB all mean save as new. The length floor
 /// was already applied by `offer_candidates`, so only floor-passing skills can come back.
 pub(crate) fn final_verdict<'a>(raw: &str, offered: &[SkillView<'a>]) -> Option<SkillView<'a>> {
-    if raw.len() > 64 * 1024 {
+    if raw.len() > JUDGE_REPLY_MAX_BYTES {
         return None;
     }
     let reply: serde_json::Value = serde_json::from_str(crate::extract_json_object(raw)?).ok()?;
