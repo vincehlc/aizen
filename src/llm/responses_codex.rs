@@ -1373,6 +1373,10 @@ fn parse_usage(u: &Value) -> Option<Usage> {
 
 #[cfg(test)]
 mod tests {
+    #![expect(
+        clippy::await_holding_lock,
+        reason = "Serialize against tests that exhaust the process-wide image budget; loopback servers never take this lock"
+    )]
     use super::*;
     use crate::core::types::{FunctionDef, ToolDef};
 
@@ -1390,6 +1394,7 @@ mod tests {
 
     #[tokio::test]
     async fn quiet_codex_usage_observer_reports_latest_once_on_success_and_failure() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::client::tests::raw_sse_backend;
         const PREFIX: &str = "data: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":5,\"output_tokens\":1}}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[],\"usage\":{\"input_tokens\":11,\"output_tokens\":3}}}\n\n";
         for (ending, success) in [
@@ -1441,6 +1446,7 @@ mod tests {
 
     #[tokio::test]
     async fn quiet_codex_partial_eof_and_invalid_arguments_are_not_done() {
+        let _images = crate::llm::image_send::image_test_lock();
         const INCOMPLETE: &str = "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c1\",\"name\":\"read\",\"arguments\":\"{\"}}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[]}}\n\n";
         for reply in [SSE_FIRST_DELTA, INCOMPLETE] {
             let (url, hits) = stub_backend(vec![(200, reply)]).await;
@@ -1452,6 +1458,7 @@ mod tests {
 
     #[tokio::test]
     async fn quiet_codex_error_keeps_correlation_not_echoed_body() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) = stub_backend(vec![(200, "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"UPSTREAM_BAD_RESPONSE\",\"status\":0,\"correlation_id\":\"req-codex-1\",\"message\":\"sk-secret data:image/png;base64,PRIVATE\"}}}\n\n")]).await;
         let auth = CountingAuth::default();
         let err = run(&url, &auth, StreamSink::default()).await.err().unwrap();
@@ -1466,6 +1473,7 @@ mod tests {
 
     #[tokio::test]
     async fn non_json_error_event_cannot_be_erased_by_later_completed_response() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::with_image_delivery;
         for reply in [
             "event: error\ndata: sk-secret data:image/png;base64,PRIVATE\n\ndata: {\"type\":\"response.completed\",\"response\":{\"output\":[]}}\n\n",
@@ -1489,6 +1497,7 @@ mod tests {
 
     #[tokio::test]
     async fn codex_raw_limit_and_malformed_are_not_replayed_or_tool_salvaged() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::{
             client::tests::{raw_limit_reply, raw_sse_backend},
             media::with_image_delivery,
@@ -1564,6 +1573,7 @@ mod tests {
 
     #[tokio::test]
     async fn salvaged_codex_tools_clear_live_image_receipt() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::{with_image_delivery, ImageDeliveryReceipt};
         const REPLY: &str = "data: {\"type\":\"response.output_item.done\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c1\",\"name\":\"read\",\"arguments\":\"{}\"}}\n\n";
         let (url, hits) = stub_backend(vec![(200, REPLY)]).await;
@@ -1665,6 +1675,7 @@ data: {"type":"response.completed","response":{"output":[]}}
 
     #[tokio::test]
     async fn actual_codex_receiver_gets_every_output_before_exact_image_bytes_without_metadata() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::llm::media::{destination_key, tests as media_tests};
         const REPLY: &str = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"reviewed\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n";
         let (base, receiver, server) =
@@ -1719,6 +1730,7 @@ data: {"type":"response.completed","response":{"output":[]}}
 
     #[tokio::test]
     async fn actual_codex_lifecycle_omits_released_pixels_and_accounts_every_send() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::core::reference_media::{
             ReferenceDerivatives, ReferenceGrantScope, ReferenceRegistry, ReferenceRoute,
         };
@@ -1994,6 +2006,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// still rejected looped forever. One refresh, then the turn asks for a re-login.
     #[tokio::test]
     async fn a_rejected_refreshed_token_asks_for_login_instead_of_looping() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) =
             stub_backend(vec![(401, "{\"error\":{\"message\":\"token expired\"}}")]).await;
         let auth = CountingAuth::default();
@@ -2015,6 +2028,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// an answer that quoted `server_is_overloaded` was discarded and re-billed.
     #[tokio::test]
     async fn an_answer_that_quotes_the_overload_marker_is_not_retried() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) = stub_backend(vec![(200, SSE_QUOTES_MARKER)]).await;
         let auth = CountingAuth::default();
         let turn = run(&url, &auth, StreamSink::default()).await.unwrap();
@@ -2034,6 +2048,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// backoff, then failed as such.
     #[tokio::test]
     async fn an_overload_envelope_is_retried_then_fails() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) = stub_backend(vec![(200, SSE_OVERLOAD_ENVELOPE)]).await;
         let auth = CountingAuth::default();
         let err = err_text(run(&url, &auth, StreamSink::default()).await);
@@ -2050,6 +2065,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// and, because text already arrived, the turn is not replayed.
     #[tokio::test]
     async fn a_stalled_stream_fails_on_the_watchdog_not_the_read_timeout() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) = stalling_backend(SSE_FIRST_DELTA, Duration::from_secs(3)).await;
         let auth = CountingAuth::default();
         let started = Instant::now();
@@ -2071,6 +2087,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// the chat-completions path — the manual "it froze, I retried, it was fine" case.
     #[tokio::test]
     async fn a_stream_that_dies_blank_is_replayed_then_fails() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, hits) = stalling_backend("", Duration::from_secs(3)).await;
         let auth = CountingAuth::default();
         let err = err_text(run(&url, &auth, StreamSink::default()).await);
@@ -2086,6 +2103,7 @@ data: {\"type\":\"response.completed\",\"response\":{\"error\":null,\"output\":[
     /// comes back keyed by the call's position in the turn.
     #[tokio::test]
     async fn completed_calls_start_eagerly_and_ride_by_position() {
+        let _images = crate::llm::image_send::image_test_lock();
         let (url, _hits) = stub_backend(vec![(200, SSE_ONE_CALL)]).await;
         let auth = CountingAuth::default();
         let seen = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));

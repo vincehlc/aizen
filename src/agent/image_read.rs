@@ -621,6 +621,7 @@ mod tests {
 
     #[test]
     fn actual_png_and_crop_have_typed_pixels_and_lineage() {
+        let _images = crate::llm::image_send::image_test_lock();
         let fixture = Fixture::new();
         fixture.png();
         let tool = fixture.tool();
@@ -695,6 +696,7 @@ mod tests {
 
     #[test]
     fn reference_reads_require_live_scoped_grants_and_never_become_output_evidence() {
+        let _images = crate::llm::image_send::image_test_lock();
         use crate::core::reference_media::{
             ReferenceDerivatives, ReferenceGrantScope, ReferenceRegistry, ReferenceRoute,
         };

@@ -383,7 +383,7 @@ async fn a_total_deadline_truncates_a_healthy_stream_but_the_shared_client_has_n
 #[tokio::test]
 #[expect(
     clippy::await_holding_lock,
-    reason = "The env fixture lock must cover the awaited request; the loopback server does not acquire it"
+    reason = "The env fixture lock, then the image budget lock, must cover the awaited request; the loopback server acquires neither"
 )]
 async fn a_chore_call_against_a_silent_gateway_returns_err_not_a_permanent_park() {
     use tokio::io::AsyncReadExt;
@@ -405,6 +405,7 @@ async fn a_chore_call_against_a_silent_gateway_returns_err_not_a_permanent_park(
     let _g = crate::core::config::TEST_HOME_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
+    let _images = crate::llm::image_send::image_test_lock();
     const K: &str = "AIZEN_SUBAGENT_CALL_SECS";
     let prior = std::env::var(K).ok();
     std::env::set_var(K, "1");

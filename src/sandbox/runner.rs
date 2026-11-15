@@ -1535,6 +1535,11 @@ mod tests {
     #[test]
     fn strict_fails_closed_where_the_kernel_cannot_enforce() {
         let _g = lock();
+        // `req` uses the cwd as workspace. With HOME/USERPROFILE unset by a fixture the cwd counts
+        // as home and the broad-workspace refusal wins, without the "guarded" hint asserted below.
+        let _home_lock = crate::core::config::TEST_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         crate::sandbox::set_mode(SandboxMode::Strict);
         let r = prepare_std(req(CommandOrigin::ShellRun));
         crate::sandbox::set_mode(SandboxMode::Auto);
